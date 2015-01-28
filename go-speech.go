@@ -70,6 +70,10 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		// if found - serve it
 		log.Print("Serving file")
 		http.ServeFile(w, r, savedFilename)
+		// if need to send callback - send it immedately
+		if requestCallback != "" {
+			go callback(savedFilename, requestCallback)
+		}
 	} else {
 		// else - try to download
 		log.Print("Downloading result of ", proxyRequest)
