@@ -1,0 +1,4 @@
+cache/
+*.swo
+*.swp
+go-speech
