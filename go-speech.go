@@ -94,5 +94,5 @@ func main() {
 	}
 	log.Print("started on http://0.0.0.0:8989")
 	downloadingFiles = map[string]bool{}
-	log.Fatal(http.ListenAndServe(":8989", nil))
+	log.Fatal(http.ListenAndServe("0.0.0.0:8989", nil))
 }
