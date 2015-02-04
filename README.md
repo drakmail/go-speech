@@ -1,6 +1,6 @@
 # GoSpeech
 
-GoSpeech is a wrapper under Yandex.SpeechKit voice to text engine. It proxifies requests to SpeechKit API, handling long-running requests. It could prevent request timeouts in services, integrated with SpeechKit, because GoSpeech sends callback after file downloaded successfully.
+GoSpeech is a wrapper for Yandex.SpeechKit Voice-To-Text engine. It proxifies requests to SpeechKit API, handling long-running requests. It could prevent request timeouts in services, integrated with SpeechKit, because GoSpeech sends callback after file downloaded successfully.
 
 ## Usage example:
 
