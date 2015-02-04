@@ -8,9 +8,23 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 )
 
 var downloadingFiles map[string]bool
+
+func fileSize(file string) int64 {
+	f, err := os.Open(file)
+	if err != nil {
+		log.Print("Couldn't open file")
+		return 0
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		log.Print("Couldn't stat file")
+	}
+	return fi.Size()
+}
 
 func callback(filename, callbackURL string) {
 	_, err := http.PostForm(callbackURL, url.Values{"filename": {filename}})
@@ -19,29 +33,50 @@ func callback(filename, callbackURL string) {
 	}
 }
 
-func downloadFile(fileURL, filename, callbackURL string) {
-	if !downloadingFiles[filename] {
-		log.Print("started downloading file ", fileURL)
-		downloadingFiles[filename] = true
-		resp, err := http.Get(fileURL)
-		if err != nil {
-			log.Print("Couldn't fetch url: ", err)
+// TODO: Refactor :)
+func downloadFile(fileURL, filename, callbackURL string, retries int32) bool {
+	if retries >= 0 {
+		time.Sleep(1000 * time.Millisecond)
+		if !downloadingFiles[filename] {
+			log.Print("started downloading file to ", filename)
+			downloadingFiles[filename] = true
+			resp, err := http.Get(fileURL)
+			if err != nil {
+				log.Print("Couldn't fetch url: ", err)
+				downloadingFiles[filename] = false
+				return downloadFile(fileURL, filename, callbackURL, retries-1)
+			}
+			defer resp.Body.Close()
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Print("Couldn't read body: ", err)
+				downloadingFiles[filename] = false
+				return downloadFile(fileURL, filename, callbackURL, retries-1)
+			}
+			err = ioutil.WriteFile(filename, body, 0777)
+			if err != nil {
+				log.Print("Couldn't create and write to a cache file: ", err)
+				downloadingFiles[filename] = false
+				return downloadFile(fileURL, filename, callbackURL, retries-1)
+			}
+			log.Print("Downloading file complete ", filename)
+			downloadingFiles[filename] = false
+			// TODO: if downloaded file is valid mp3 with length > 1 sec - save MD5.mp3 and serve it
+			// if downloaded file is > 4000 bytes length then all ok
+			if fileSize(filename) > 4000 {
+				callback(filename, callbackURL)
+				return true
+			} else {
+				// redownload it
+				return downloadFile(fileURL, filename, callbackURL, retries-1)
+			}
+		} else {
+			log.Print("File already downloading...")
+			return false
 		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Print("Couldn't read body: ", err)
-		}
-		err = ioutil.WriteFile(filename, body, 0777)
-		if err != nil {
-			log.Print("Couldn't create and write to a temp file: ", err)
-		}
-		log.Print("Downloading file complete", fileURL)
-		downloadingFiles[filename] = false
-		// if downloaded file is valid mp3 with length > 1 sec - save MD5.mp3 and serve it
-		callback(filename, callbackURL)
 	} else {
-		log.Print("File already downloading...")
+		log.Print("Couldn't download file after 3 retries =(")
+		return false
 	}
 }
 
@@ -78,9 +113,9 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		// else - try to download
 		log.Print("Downloading result of ", proxyRequest)
 		if requestCallback != "" {
-			go downloadFile(proxyRequest, savedFilename, requestCallback)
+			go downloadFile(proxyRequest, savedFilename, requestCallback, 3)
 		} else {
-			go downloadFile(proxyRequest, savedFilename, "https://posthere.io/d53c-48ad-90db")
+			go downloadFile(proxyRequest, savedFilename, "https://posthere.io/d53c-48ad-90db", 3)
 		}
 	}
 }
